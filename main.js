@@ -2,38 +2,15 @@ import './style.css';
 import { WebContainer } from '@webcontainer/api';
 import { files } from './files';
 
-/** @type {import('webcontainer/api').WebContainer} */
+/** @type {import('@webcontainer/api').WebContainer}  */
 let webcontainerInstance;
 
-async function installDependencies() {
-  // Install dependencies
-  const installProcess = await webcontainerInstance.spawn('npm', ['install']);
-
-  installProcess.output.pipeTo(
-    new WritableStream({
-      write(data) {
-        console.log(data);
-      },
-    })
-  );
-
-  // Wait for install comant to exit.
-  return installDependencies;
-}
-
-async function startDevServer() {
-  // Run `npm run start` to start the Express app
-  await webcontainerInstance.spawn('npm', ['run', 'start']);
-
-  // Wait for `server-ready` event
-  webcontainerInstance.on('server-ready', (port, url) => {
-    console.log('URl ------------------> ', url);
-    iframeEl.src = url;
-  });
-}
-
 window.addEventListener('load', async () => {
-  textarea.value = files['index.js'].file.contents;
+  textareaEl.value = files['index.js'].file.contents;
+
+  textareaEl.addEventListener('input', (e) => {
+    writeIndexJS(e.currentTarget.value);
+  });
 
   // Call only once
   webcontainerInstance = await WebContainer.boot();
@@ -45,22 +22,51 @@ window.addEventListener('load', async () => {
   }
 
   startDevServer();
+
+
 });
+
+async function installDependencies() {
+  // Install dependencies
+  const installProcess = await webcontainerInstance.spawn('npm', ['install']);
+  installProcess.output.pipeTo(new WritableStream({
+    write(data) {
+      console.log(data);
+    }
+  }))
+  // Wait for install command to exit
+  return installProcess.exit;
+}
+
+async function startDevServer() {
+  // Run `npm run start` to start the Express app
+  await webcontainerInstance.spawn('npm', ['run', 'start']);
+
+  // Wait for `server-ready` event
+  webcontainerInstance.on('server-ready', (port, url) => {
+    console.log('URL: ' + url);
+    iframeEl.src = url;
+  });
+}
+
+/** @param {string} content */
+async function writeIndexJS(content) {
+  await webcontainerInstance.fs.writeFile('index.js', content);
+}
 
 document.querySelector('#app').innerHTML = `
   <div class="container">
     <div class="editor">
       <textarea>I am a textarea</textarea>
-    </div>  
+    </div>
     <div class="preview">
       <iframe src="loading.html"></iframe>
-    </div>  
-
+    </div>
   </div>
-`;
+`
 
-/** @type {HTMLIFrameElement | null} **/
-const iframe = document.querySelector('iframe');
+/** @type {HTMLIFrameElement | null} */
+const iframeEl = document.querySelector('iframe');
 
-/** @type {HTMLTextAreaElement | null } **/
-const textarea = document.querySelector('textarea');
+/** @type {HTMLTextAreaElement | null} */
+const textareaEl = document.querySelector('textarea');
